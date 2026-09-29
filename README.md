@@ -2,6 +2,10 @@
 
 使用板載麥克風經 USB 傳送音訊，由電腦辨識中文／英文指令並控制藍燈、綠燈及閃爍次數。開發板不需要 Wi-Fi，電腦需連網使用 Google 語音辨識。
 
+## 執行環境
+
+- Python 3.10.21
+
 ## 使用方式
 
 1. Arduino IDE 開啟 `assessment_1/assessment_1.ino`，選擇 AMB82-MINI 後燒入；完成後按 RESET 並關閉序列埠監控。
