@@ -6,7 +6,7 @@ extern "C" {
 extern serial_t log_uart_obj;
 const int BLUE_LED = 23, GREEN_LED = 24;
 bool audioReady = false, lit = false;
-int activePin = -1, remaining = 0;
+int activeMask = 0, remaining = 0; // bit 0: blue, bit 1: green
 unsigned long lastToggle = 0;
 char input[96];
 size_t used = 0;
@@ -14,21 +14,25 @@ bool overflow = false;
 
 void allOff() {
   digitalWrite(BLUE_LED, LOW); digitalWrite(GREEN_LED, LOW);
-  lit = false; activePin = -1; remaining = 0;
+  lit = false; activeMask = 0; remaining = 0;
 }
-void startLight(bool blue, int count) {
+void writeLights() {
+  digitalWrite(BLUE_LED, lit && (activeMask & 1) ? HIGH : LOW);
+  digitalWrite(GREEN_LED, lit && (activeMask & 2) ? HIGH : LOW);
+}
+void startLight(int mask, int count) {
   allOff();
-  activePin = blue ? BLUE_LED : GREEN_LED;
+  activeMask = mask;
   remaining = count;
-  digitalWrite(activePin, HIGH);
   lit = true; lastToggle = millis();
+  writeLights();
 }
 void tickLight() {
-  if (activePin < 0 || remaining == 0 || millis() - lastToggle < 300) return;
+  if (activeMask == 0 || remaining == 0 || millis() - lastToggle < 300) return;
   lastToggle = millis();
   lit = !lit;
-  digitalWrite(activePin, lit ? HIGH : LOW);
-  if (!lit && --remaining == 0) activePin = -1;
+  writeLights();
+  if (!lit && --remaining == 0) activeMask = 0;
 }
 void handleCommand() {
   input[used] = 0;
@@ -45,14 +49,14 @@ void handleCommand() {
     Serial.print("MIC:"); Serial.print(id); Serial.print(":"); Serial.println(count);
   } else if (sscanf(input, "SET %lu %7s %d %c", &id, color, &count, &extra) == 3
              && count >= 0 && count <= 100
-             && (!strcmp(color, "BLUE") || !strcmp(color, "GREEN") || !strcmp(color, "OFF"))) {
+             && (!strcmp(color, "BLUE") || !strcmp(color, "GREEN") || !strcmp(color, "BOTH") || !strcmp(color, "OFF"))) {
     if (!strcmp(color, "OFF")) allOff();
-    else startLight(!strcmp(color, "BLUE"), count);
+    else startLight(!strcmp(color, "BLUE") ? 1 : !strcmp(color, "GREEN") ? 2 : 3, count);
     Serial.print("OK:"); Serial.print(id); Serial.print(":");
     Serial.print(color); Serial.print(":"); Serial.println(count);
   } else if (sscanf(input, "STATE %lu %c", &id, &extra) == 1) {
     Serial.print("STATE:"); Serial.print(id); Serial.print(":");
-    Serial.print(activePin == BLUE_LED ? "BLUE" : activePin == GREEN_LED ? "GREEN" : "OFF");
+    Serial.print(activeMask == 3 ? "BOTH" : activeMask == 1 ? "BLUE" : activeMask == 2 ? "GREEN" : "OFF");
     Serial.print(":"); Serial.print(remaining); Serial.print(":"); Serial.println(lit ? 1 : 0);
   } else Serial.println("ERR:INVALID_COMMAND");
 }

@@ -15,7 +15,23 @@ def parse_command(text):
     text = unicodedata.normalize("NFKC", text).lower()
     text = "".join(c for c in text if not c.isspace()
                    and not unicodedata.category(c).startswith("P"))
-    text = text.translate(str.maketrans("边开灯", "邊開燈"))
+    text = text.translate(str.maketrans("边开灯蓝绿闪烁时", "邊開燈藍綠閃爍時"))
+    text = text.replace("3", "三")
+    special = {
+        "藍燈閃爍三次": "BLUE_BLINK3", "左邊閃爍三次": "BLUE_BLINK3",
+        "綠燈閃爍三次": "GREEN_BLINK3", "右邊閃爍三次": "GREEN_BLINK3",
+        "藍綠燈閃爍三次": "BOTH_BLINK3", "兩顆燈閃爍三次": "BOTH_BLINK3",
+        "同時亮燈": "BOTH", "藍綠同時亮燈": "BOTH", "兩顆燈同時亮": "BOTH",
+        "turnonbothlights": "BOTH", "bothlightson": "BOTH",
+    }
+    for color, target in (("blue", "BLUE"), ("left", "BLUE"),
+                          ("green", "GREEN"), ("right", "GREEN"), ("both", "BOTH")):
+        noun = "lights" if color == "both" else "light"
+        for article in ("", "the"):
+            for times in ("three", "三"):
+                special["blink" + article + color + noun + times + "times"] = target + "_BLINK3"
+    if text in special:
+        return special[text]
     return {"左邊開燈": "BLUE", "右邊開燈": "GREEN",
             "turnontheleftlight": "BLUE", "turnonleftlight": "BLUE",
             "leftlighton": "BLUE", "turnontherightlight": "GREEN",
@@ -54,9 +70,13 @@ class Controller:
 
     def light(self, color):
         with self.lock:
-            count = 0 if color == "OFF" else self.count
+            fixed = {"BLUE_BLINK3": "BLUE", "GREEN_BLINK3": "GREEN", "BOTH_BLINK3": "BOTH"}
+            if color in fixed:
+                color, count = fixed[color], 3
+            else:
+                count = 0 if color in ("OFF", "BOTH") else self.count
             self.board.set_light(color, count)
-            self.log({"BLUE": "藍燈亮起", "GREEN": "綠燈亮起", "OFF": "兩燈已熄滅"}[color])
+            self.log({"BLUE": "藍燈亮起", "GREEN": "綠燈亮起", "BOTH": "藍燈與綠燈同時亮起", "OFF": "兩燈已熄滅"}[color])
             if count:
                 self.log("閃爍 {} 次後熄滅".format(count))
 
@@ -128,7 +148,7 @@ class Controller:
                         if len(matches) == 1:
                             self.light(matches.pop())
                         elif len(matches) > 1:
-                            self.log("中英文結果方向不一致，請再說一次。")
+                            self.log("中英文辨識指令不一致，請再說一次。")
                         elif errors:
                             self.log("語音服務無法使用，請檢查網路：" + errors[0])
                         else:

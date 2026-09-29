@@ -115,7 +115,7 @@ class Board:
                 raise RuntimeError("麥克風控制回覆不符。")
 
     def set_light(self, color, count):
-        if color not in ("BLUE", "GREEN", "OFF"):
+        if color not in ("BLUE", "GREEN", "BOTH", "OFF"):
             raise ValueError("無效的燈號。")
         if type(count) is not int or not 0 <= count <= 100:
             raise ValueError("閃爍次數必須是 0～100 的整數。")

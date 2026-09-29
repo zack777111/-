@@ -1,3 +1,8 @@
 .venv/
+.build/
+.vscode/
 __pycache__/
 *.pyc
+*.docx
+test_voice_control.py
+assessment_1/wifi_config.h

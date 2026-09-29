@@ -13,13 +13,13 @@
 <div class="grid">
 <section class="card"><div class="heading"><h2>燈光控制</h2><span class="small" id="connection">正在連接開發板…</span></div>
 <div class="leds"><div class="lamp blue" id="blue"><div class="orb"></div><strong>左邊 · 藍燈</strong><span id="blueState">等待狀態</span><button data-color="BLUE">開啟藍燈</button></div><div class="lamp green" id="green"><div class="orb"></div><strong>右邊 · 綠燈</strong><span id="greenState">等待狀態</span><button data-color="GREEN">開啟綠燈</button></div></div>
-<div class="actions"><button data-color="OFF">全部熄滅</button></div><p class="small">切換燈色會立即停止另一顆燈；狀態由開發板回報。</p>
+<div class="actions"><button data-color="BLUE_BLINK3">藍燈閃爍三次</button><button data-color="GREEN_BLINK3">綠燈閃爍三次</button><button data-color="BOTH_BLINK3">藍綠燈閃爍三次</button><button data-color="BOTH">同時亮燈</button><button data-color="OFF">全部熄滅</button></div><p class="small">單色指令會熄滅另一顆燈；「同時亮燈」讓兩燈持續亮起。固定三次指令不受下方次數設定影響。</p>
 <label for="count">閃爍次數</label><div class="settingrow"><input id="count" type="number" min="0" max="100" step="1" value="0"><span class="small">0 = 持續亮燈<br>1～100 次 = 閃完熄滅</span></div><p class="small">每次亮 0.3 秒、熄 0.3 秒。設定套用於下一次開燈。</p>
 </section>
 <section class="card"><h2>語音控制</h2><label for="language">辨識語言</label><select id="language"><option value="auto">中文 + English（自動比對）</option><option value="zh-TW">中文（台灣）</option><option value="en-US">English（美式）</option></select>
 <div class="actions"><button class="primary" id="save">儲存設定</button><span id="saved" class="small" style="align-self:center">目前：持續亮燈</span></div>
 <div class="actions"><button id="start" class="primary">開始聆聽</button><button id="stop" disabled>停止聆聽</button></div><div class="status" id="phase" role="status">尚未開始</div><p class="small">開始時請安靜 1 秒，待顯示「聆聽中」後對板子說話。辨識期間請等待下一次聆聽提示。</p>
-<div class="commands"><div><strong>左邊開燈</strong><p>Turn on the left light.<br>Left light on.</p></div><div><strong>右邊開燈</strong><p>Turn on the right light.<br>Right light on.</p></div></div>
+<div class="commands"><div><strong>左邊開燈</strong><p>Turn on the left light.<br>Left light on.</p></div><div><strong>右邊開燈</strong><p>Turn on the right light.<br>Right light on.</p></div><div><strong>藍燈閃爍三次</strong><p>Blink the blue light three times.</p></div><div><strong>綠燈閃爍三次</strong><p>Blink the green light three times.</p></div><div><strong>藍綠燈閃爍三次</strong><p>Blink both lights three times.</p></div><div><strong>同時亮燈</strong><p>Turn on both lights.</p></div></div>
 </section>
 <section class="card wide"><div class="heading"><h2>執行紀錄</h2><span class="small">成功訊息同步顯示於終端機</span></div><div id="logs" class="log" aria-live="polite"><p class="small">尚無紀錄，先試著開啟一顆燈。</p></div></section>
 </div><div id="notice" role="alert"></div><footer>板載麥克風透過 USB UART 收音與控制燈號，板子不需 Wi-Fi。<br>電腦仍需上網：開始聆聽後，音訊會由電腦傳至 Google 語音辨識服務。關閉網頁不會停止聆聽；請先按「停止聆聽」。</footer>
@@ -29,9 +29,9 @@ async function api(path,data){const response=await fetch('/api/'+path,{method:'P
 async function save(){if(!$('count').checkValidity()||$('count').value==='')throw Error('請輸入 0～100 的整數次數。');await api('settings',{count:Number($('count').value),language:$('language').value});$('saved').textContent='已儲存：'+(Number($('count').value)===0?'持續亮燈':$('count').value+' 次');}
 async function action(fn){if(pending)return;pending=true;$('notice').textContent='';try{await fn();}catch(error){$('notice').textContent=error.message;}finally{pending=false;}}
 $('save').onclick=()=>action(save);$('start').onclick=()=>action(async()=>{await save();await api('start');});$('stop').onclick=()=>action(()=>api('stop'));
-document.querySelectorAll('[data-color]').forEach(button=>button.onclick=()=>action(async()=>{if(button.dataset.color!=='OFF')await save();await api('light',{color:button.dataset.color});}));
+document.querySelectorAll('[data-color]').forEach(button=>button.onclick=()=>action(async()=>{if(['BLUE','GREEN'].includes(button.dataset.color))await save();await api('light',{color:button.dataset.color});}));
 async function poll(){try{const response=await fetch('/api/status');if(!response.ok)throw Error('無法讀取狀態');const s=await response.json();$('connection').textContent=s.error?'開發板未連線':'開發板已連線';$('phase').textContent=s.phase;$('start').disabled=s.listening;$('stop').disabled=!s.listening;if(!initialized){$('count').value=s.count;$('language').value=s.language;initialized=true;}
-for(const color of ['BLUE','GREEN']){const id=color.toLowerCase(),active=s.board&&s.board.color===color;$(id).classList.toggle('active',Boolean(active&&s.board.lit));$(id+'State').textContent=!s.board?'無法取得狀態':active?(s.board.remaining?'閃爍中 · 尚餘 '+s.board.remaining+' 次':'持續亮燈'):'已熄滅';}
+for(const color of ['BLUE','GREEN']){const id=color.toLowerCase(),active=s.board&&(s.board.color===color||s.board.color==='BOTH');$(id).classList.toggle('active',Boolean(active&&s.board.lit));$(id+'State').textContent=!s.board?'無法取得狀態':active?(s.board.remaining?'閃爍中 · 尚餘 '+s.board.remaining+' 次':'持續亮燈'):'已熄滅';}
 if(s.error)$('notice').textContent=s.error;const logKey=JSON.stringify(s.logs);if(logKey!==lastLogs){lastLogs=logKey;$('logs').replaceChildren();for(const entry of s.logs){const row=document.createElement('div');row.className='entry';const time=document.createElement('time');time.textContent=entry.time;const text=document.createElement('span');text.textContent=entry.text;row.append(time,text);$('logs').append(row);}$('logs').scrollTop=$('logs').scrollHeight;}
 }catch(error){$('connection').textContent='電腦服務未連線';$('notice').textContent='無法連線，請確認 voice_control.py 正在執行。';}finally{setTimeout(poll,1000);}}poll();
 </script></body></html>
